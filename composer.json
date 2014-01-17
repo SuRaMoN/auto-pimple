@@ -2,7 +2,7 @@
 	"autoload": {
 		"psr-0": { "AutoPimple": "src" }
 	},
-    "name": "SuRaMoN/auto-pimple",
+    "name": "suramon/auto-pimple",
     "description": "Pimple with automated service loading",
     "require": {
         "pimple/pimple": "1.1.*"
