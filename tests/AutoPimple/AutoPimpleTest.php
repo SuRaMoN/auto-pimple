@@ -2,6 +2,7 @@
 
 namespace AutoPimple;
 
+use InvalidArgumentException;
 use PHPUnit_Framework_TestCase;
 
 
@@ -13,6 +14,23 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$c = new AutoPimple();
 		$c['true'] = $c->share(function() { return true; });
 		$this->assertTrue($c['true']);
+	}
+
+	/** @test */
+	public function testAlias()
+	{
+		$c = new AutoPimple();
+		$c->alias('true', 'false');
+		$hasFailed = false;
+
+		try {
+			$c['true'];
+		} catch(InvalidArgumentException $e) {
+			$hasFailed = true;
+		}
+		$this->assertTrue($hasFailed);
+		$c['false'] = false;
+		$this->assertFalse($c['true']);
 	}
 
 	/** @test */

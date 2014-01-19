@@ -11,6 +11,7 @@ use ReflectionMethod;
 class AutoPimple extends Pimple
 {
 	protected $prefixMap;
+	protected $aliases = array();
 
 	public function __construct(array $prefixMap = array(), array $values = array())
 	{
@@ -20,7 +21,12 @@ class AutoPimple extends Pimple
 
 	public function alias($from, $to)
 	{
-		$this->values[$from] = & $this->values[$to];
+		if($from == $to || (array_key_exists($from, $this->values) && array_key_exists($from, $this->aliases) &&
+				$this->values[$from] === $this->aliases[$from])) {
+			return;
+		}
+		$self = $this;
+		$this->values[$from] = $this->aliases[$from] = function() use ($self, $to) { return $self[$to]; };
 	}
 
     public function offsetExists($id)
