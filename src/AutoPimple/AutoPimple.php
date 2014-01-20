@@ -124,7 +124,11 @@ class AutoPimple extends Pimple
 
 		$underscoreName = $this->underscore($className);
 		$this->offsetSet($underscoreName, $this->share(function($c) use ($serviceReflector, $dependencies) {
-			return $serviceReflector->newInstanceArgs($dependencies);
+			if(count($dependencies) == 0) {
+				return $serviceReflector->newInstance();
+			} else {
+				return $serviceReflector->newInstanceArgs($dependencies);
+			}
 		}));
 	}
 }
