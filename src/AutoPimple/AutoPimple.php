@@ -29,6 +29,15 @@ class AutoPimple extends Pimple
 		$this->values[$from] = $this->aliases[$from] = function() use ($self, $to) { return $self[$to]; };
 	}
 
+	public function serviceMethod($serviceId, $methodName)
+	{
+		$self = $this;
+		return function() use ($self, $serviceId, $methodName) {
+			$arguments = func_get_args();
+			return call_user_func_array(array($self->offsetGet($serviceId), $methodName), $arguments);
+		};
+	}
+
     public function offsetExists($id)
 	{
 		foreach($this->prefixMap as $to => $froms) {

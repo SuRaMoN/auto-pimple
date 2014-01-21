@@ -2,6 +2,7 @@
 
 namespace AutoPimple;
 
+use ArrayObject;
 use InvalidArgumentException;
 use PHPUnit_Framework_TestCase;
 
@@ -14,6 +15,22 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$c = new AutoPimple();
 		$c['true'] = $c->share(function() { return true; });
 		$this->assertTrue($c['true']);
+	}
+
+	/** @test */
+	public function testServiceMethod()
+	{
+		$c = new AutoPimple();
+		$c['array'] = new ArrayObject();
+
+		$countFunction = $c->serviceMethod('array', 'count');
+		$this->assertEquals(0, $countFunction());
+		$c['array']->append(123);
+		$this->assertEquals(1, $countFunction());
+
+		$appendFunction = $c->serviceMethod('array', 'append');
+		$appendFunction(456);
+		$this->assertEquals(2, $countFunction());
 	}
 
 	/** @test */
