@@ -3,7 +3,7 @@
 namespace AutoPimple;
 
 
-class FactoryFactory
+class Factory
 {
 	protected $factoryCallback;
 
