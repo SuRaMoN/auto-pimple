@@ -21,8 +21,7 @@ class AutoPimple extends Pimple
 
 	public function createFactory($factory)
 	{
-		$factoryCallback = is_string($factory) ? function() use ($factory) { return new $factory(); } : $factory;
-		return new Factory($factoryCallback);
+		return new Factory($factory);
 	}
 
 	public function alias($from, $to)
