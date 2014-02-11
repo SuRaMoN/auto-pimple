@@ -19,6 +19,12 @@ class AutoPimple extends Pimple
 		parent::__construct($values);
 	}
 
+	public function createFactory($factory)
+	{
+		$factoryCallback = is_string($factory) ? function() use ($factory) { return new $factory(); } : $factory;
+		return new FactoryFactory($factoryCallback);
+	}
+
 	public function alias($from, $to)
 	{
 		if($from == $to || (array_key_exists($from, $this->values) && array_key_exists($from, $this->aliases) &&

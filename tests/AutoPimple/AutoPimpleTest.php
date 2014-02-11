@@ -66,5 +66,21 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals('ServiceWithDependencies', $service->getName());
 		$this->assertEquals(array('SimpleServiceWithoutDependencies'), $service->getDependenciesNames());
 	}
+
+	/** @test */
+	public function testFactoryByClassName()
+	{
+		$c = new AutoPimple();
+		$c['jos'] = $c->createFactory('stdClass');
+		$this->assertTrue($c['jos']->newInstance() instanceof \stdClass);
+	}
+
+	/** @test */
+	public function testFactoryByCallback()
+	{
+		$c = new AutoPimple();
+		$c['jos'] = $c->createFactory(function() { return new \stdClass(); });
+		$this->assertTrue($c['jos']->newInstance() instanceof \stdClass);
+	}
 }
  
