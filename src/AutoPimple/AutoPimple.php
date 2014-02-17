@@ -19,6 +19,12 @@ class AutoPimple extends Pimple
 		parent::__construct($values);
 	}
 
+    public function extend($id, $callable)
+    {
+		$this->offsetExists($id);
+		return parent::extend($id, $callable);
+	}
+
 	public function createFactory($factory)
 	{
 		return new Factory($factory);
