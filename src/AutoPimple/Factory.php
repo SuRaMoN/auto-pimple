@@ -14,7 +14,8 @@ class Factory
 
 	public function newInstance()
 	{
-		return call_user_func($this->factoryCallback);
+		$arguments = func_get_args();
+		return call_user_func_array($this->factoryCallback, $arguments);
 	}
 }
  
