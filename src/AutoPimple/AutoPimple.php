@@ -90,8 +90,13 @@ class AutoPimple extends Pimple
 
 	protected function camelize($name)
 	{
-		$name = preg_replace_callback('/(\.|_|-|^)(.)/', function($m) {
-			return ('.' == $m[1] ? '\\' : '') . ('-' == $m[1] ? $m[2] : strtoupper($m[2]));
+		$name = preg_replace_callback('/(\.|__|_|-|^)(.)/', function($m) {
+			$name = ('.' == $m[1] ? '\\' : '');
+			if($m['1'] == '__') {
+				return $name . '_' . strtoupper($m[2]);
+			} else {
+				return $name . ('-' == $m[1] ? $m[2] : strtoupper($m[2]));
+			}
 		}, $name);
 		return $name;
 	}
