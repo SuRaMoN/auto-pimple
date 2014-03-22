@@ -82,5 +82,13 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$c['jos'] = $c->createFactory(function() { return new \stdClass(); });
 		$this->assertTrue($c['jos']->newInstance() instanceof \stdClass);
 	}
+
+	/** @test */
+	public function testDefaultVlues()
+	{
+		$c = new AutoPimple(array('auto_pimple.' => ''));
+		$service = $c['fixture_classes.service_with_default_value'];
+		$this->assertEquals(30, $service->getValue());
+	}
 }
  

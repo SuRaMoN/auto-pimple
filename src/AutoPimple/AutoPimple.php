@@ -135,6 +135,9 @@ class AutoPimple extends Pimple
 
 			$dependencies = array();
 			foreach($constructorReflector->getParameters() as $parameter) {
+				if($parameter->isDefaultValueAvailable()) {
+					break;
+				}
 				$typeHintClass = $parameter->getClass();
 				if(null === $typeHintClass) {
 					return;
