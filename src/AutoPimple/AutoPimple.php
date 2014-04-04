@@ -25,6 +25,13 @@ class AutoPimple extends Pimple
 		return parent::extend($id, $callable);
 	}
 
+	public function autoFactory($className)
+	{
+		$serviceReflector = new ReflectionClass($className);
+		$underscoreName = $this->underscore($className);
+		return new Factory($this->factoryCallbackFromReflector($serviceReflector));
+	}
+
 	public function createFactory($factory)
 	{
 		return new Factory($factory);
@@ -124,10 +131,8 @@ class AutoPimple extends Pimple
 		}
 	}
 
-	protected function tryAutoRegisterServiceFromClassName($className)
+	public function factoryCallbackFromReflector(ReflectionClass $serviceReflector)
 	{
-		$serviceReflector = new ReflectionClass($className);
-
 		if(! $serviceReflector->hasMethod('__construct')) {
 			$dependencies = array();
 		} else {
@@ -150,14 +155,20 @@ class AutoPimple extends Pimple
 			}
 		}
 
-		$underscoreName = $this->underscore($className);
-		$this->offsetSet($underscoreName, $this->share(function($c) use ($serviceReflector, $dependencies) {
+		return function() use ($serviceReflector, $dependencies) {
 			if(count($dependencies) == 0) {
 				return $serviceReflector->newInstance();
 			} else {
 				return $serviceReflector->newInstanceArgs($dependencies);
 			}
-		}));
+		};
+	}
+
+	protected function tryAutoRegisterServiceFromClassName($className)
+	{
+		$serviceReflector = new ReflectionClass($className);
+		$underscoreName = $this->underscore($className);
+		$this->offsetSet($underscoreName, $this->share($this->factoryCallbackFromReflector($serviceReflector)));
 	}
 }
  
