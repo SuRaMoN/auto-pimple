@@ -99,11 +99,28 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals('ServiceWithDependencies', $serviceFactory->newInstance()->getName());
 	}
 
+	/** @test */
+	public function testFactoryByServiceName()
+	{
+		$c = new AutoPimple();
+		$serviceFactory = $c['auto_pimple.fixture_classes.service_with_dependencies.factory'];
+		$this->assertEquals('ServiceWithDependencies', $serviceFactory->newInstance()->getName());
+	}
+
+	/** @test */
+	public function testInjectParamatersIntoFactoryByServiceName()
+	{
+		$c = new AutoPimple(array('auto_pimple.' => ''));
+		$c['fixture_classes.service_with_unfulfillable_dependencies.value'] = 1;
+		$serviceFactory = $c['fixture_classes.service_with_unfulfillable_dependencies.factory'];
+		$this->assertEquals(1, $serviceFactory->newInstance()->getValue());
+	}
+
 	/**
 	 * @test
 	 * @expectedException InvalidArgumentException
 	 */
-	public function testExceptionWIthDependenciesAreUnfulfillable()
+	public function testExceptionWithDependenciesAreUnfulfillable()
 	{
 		$c = new AutoPimple();
 		$serviceFactory = $c->autoFactory('AutoPimple\FixtureClasses\ServiceWithUnfulfillableDependencies');

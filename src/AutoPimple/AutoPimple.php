@@ -10,6 +10,9 @@ use ReflectionMethod;
 
 class AutoPimple extends Pimple
 {
+	const FACTORY = true;
+	const NON_FACTORY = false;
+
 	protected $prefixMap;
 	protected $aliases = array();
 
@@ -131,17 +134,30 @@ class AutoPimple extends Pimple
 		}
 		$className = $this->camelize($id);
 		if(class_exists($className)) {
-			return $this->tryAutoRegisterServiceFromClassName($className, $id);
+			return $this->tryAutoRegisterServiceFromClassName($className, self::NON_FACTORY, $id);
+		}
+		if(substr($id, -8) == '.factory') {
+			$className = $this->camelize(substr($id, 0, -8));
+			if(class_exists($className)) {
+				return $this->tryAutoRegisterServiceFromClassName($className, self::FACTORY, substr($id, 0, -8));
+			}
 		}
 	}
 
-	protected function tryAutoRegisterServiceFromClassName($className, $serviceName = null)
+	protected function tryAutoRegisterServiceFromClassName($className, $isFactory, $serviceName = null)
 	{
 		$serviceReflector = new ReflectionClass($className);
 		$underscoreName = $this->underscore($className);
-		$serviceFactory = $this->factoryCallbackFromReflectorOrNull($serviceReflector, $serviceName);
-		if(null !== $serviceFactory) {
-			$this->offsetSet($underscoreName, $this->share($serviceFactory));
+		$serviceFactoryCallback = $this->factoryCallbackFromReflectorOrNull($serviceReflector, $serviceName);
+		if(null === $serviceFactoryCallback) {
+			return;
+		}
+		if($isFactory) {
+			$this->offsetSet($underscoreName . '.factory', $this->share(function () use ($serviceFactoryCallback) {
+				return new Factory($serviceFactoryCallback);
+			}));
+		} else {
+			$this->offsetSet($underscoreName, $this->share($serviceFactoryCallback));
 		}
 	}
 
