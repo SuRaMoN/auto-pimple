@@ -29,7 +29,11 @@ class AutoPimple extends Pimple
 	{
 		$serviceReflector = new ReflectionClass($className);
 		$underscoreName = $this->underscore($className);
-		return new Factory($this->factoryCallbackFromReflector($serviceReflector));
+		$factoryCallback = $this->factoryCallbackFromReflectorOrNull($serviceReflector);
+		if(null === $factoryCallback) {
+            throw new InvalidArgumentException('Unable to create factory for this class');
+		}
+		return new Factory($factoryCallback);
 	}
 
 	public function createFactory($factory)
@@ -78,7 +82,7 @@ class AutoPimple extends Pimple
 				}
 				$prefixedId = $to . substr($id, strlen($from));
 				if(! array_key_exists($prefixedId, $this->values)) {
-					$this->tryAutoRegisterServiceFromId($prefixedId);
+					$this->tryAutoRegisterServiceFromFullServiceName($prefixedId);
 				}
 				if(array_key_exists($prefixedId, $this->values)) {
 					$this->alias($id, $prefixedId);
@@ -120,18 +124,28 @@ class AutoPimple extends Pimple
 		return strtolower($name);
 	}
 
-	protected function tryAutoRegisterServiceFromId($id)
+	protected function tryAutoRegisterServiceFromFullServiceName($id)
 	{
 		if(parent::offsetExists($id)) {
 			return;
 		}
 		$className = $this->camelize($id);
 		if(class_exists($className)) {
-			return $this->tryAutoRegisterServiceFromClassName($className);
+			return $this->tryAutoRegisterServiceFromClassName($className, $id);
 		}
 	}
 
-	public function factoryCallbackFromReflector(ReflectionClass $serviceReflector)
+	protected function tryAutoRegisterServiceFromClassName($className, $serviceName = null)
+	{
+		$serviceReflector = new ReflectionClass($className);
+		$underscoreName = $this->underscore($className);
+		$serviceFactory = $this->factoryCallbackFromReflectorOrNull($serviceReflector, $serviceName);
+		if(null !== $serviceFactory) {
+			$this->offsetSet($underscoreName, $this->share($serviceFactory));
+		}
+	}
+
+	public function factoryCallbackFromReflectorOrNull(ReflectionClass $serviceReflector, $serviceName = null)
 	{
 		if(! $serviceReflector->hasMethod('__construct')) {
 			$dependencies = array();
@@ -140,16 +154,21 @@ class AutoPimple extends Pimple
 
 			$dependencies = array();
 			foreach($constructorReflector->getParameters() as $parameter) {
+				$underscoredParameterName = $this->underscore(ucfirst($parameter->getName()));
+				if(null !== $serviceName && $this->offsetExists("$serviceName.$underscoredParameterName")) {
+					$dependencies[] = $this->offsetGet("$serviceName.$underscoredParameterName");
+					continue;
+				}
 				if($parameter->isDefaultValueAvailable()) {
 					break;
 				}
 				$typeHintClass = $parameter->getClass();
 				if(null === $typeHintClass) {
-					return;
+					return null;
 				}
 				$underscoreName = $this->underscore($typeHintClass->getName());
 				if(! $this->offsetExists($underscoreName)) {
-					return;
+					return null;
 				}
 				$dependencies[] = $this->offsetGet($underscoreName);
 			}
@@ -162,13 +181,6 @@ class AutoPimple extends Pimple
 				return $serviceReflector->newInstanceArgs($dependencies);
 			}
 		};
-	}
-
-	protected function tryAutoRegisterServiceFromClassName($className)
-	{
-		$serviceReflector = new ReflectionClass($className);
-		$underscoreName = $this->underscore($className);
-		$this->offsetSet($underscoreName, $this->share($this->factoryCallbackFromReflector($serviceReflector)));
 	}
 }
  

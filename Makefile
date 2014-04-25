@@ -1,24 +1,25 @@
 
-.PHONY: run-tests install-vendor update-vendor init-composer clean
+.PHONY: run-tests recent-composer install-vendor update-vendor clean
 
-install-vendor: bin/composer.phar
+install-vendor: recent-composer
 	bin/composer.phar install
 
-vendor/autoload.php: bin/composer.phar
+vendor/autoload.php: recent-composer
 	bin/composer.phar install
 
 run-tests: vendor/autoload.php
 	vendor/bin/phpunit
 
-update-vendor: bin/composer.phar
+update-vendor: recent-composer
 	bin/composer.phar update
 
-init-composer: bin/composer.phar
-	bin/composer.phar init
-
 clean:
-	rm -R bin
-	rm -R vendor
+	rm -fR bin/composer.phar vendor
+
+recent-composer: bin/composer.phar
+	if bin/composer.phar about | grep -q "This development build of composer is over 30 days old"; then \
+		bin/composer.phar self-update; \
+	fi
 
 bin/composer.phar:
 	mkdir -p bin
