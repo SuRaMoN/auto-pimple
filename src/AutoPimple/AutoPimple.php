@@ -46,12 +46,13 @@ class AutoPimple extends Pimple
 
 	public function alias($from, $to)
 	{
-		if($from == $to || (array_key_exists($from, $this->values) && array_key_exists($from, $this->aliases) &&
-				$this->values[$from] === $this->aliases[$from])) {
+		$pairKey = serialize(array($from, $to));
+		if($from == $to || (array_key_exists($from, $this->values) && array_key_exists($pairKey, $this->aliases) &&
+				$this->values[$from] === $this->aliases[$pairKey])) {
 			return;
 		}
 		$self = $this;
-		$this->values[$from] = $this->aliases[$from] = function() use ($self, $to) { return $self[$to]; };
+		$this->values[$from] = $this->aliases[$pairKey] = function() use ($self, $to) { return $self[$to]; };
 	}
 
 	public function serviceMethod($serviceId, $methodName)
