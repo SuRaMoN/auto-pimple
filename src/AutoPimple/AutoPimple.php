@@ -39,6 +39,14 @@ class AutoPimple extends Pimple
 		return new Factory($factoryCallback);
 	}
 
+	public function factory($factory)
+	{
+		$self = $this;
+		return function() use ($factory, $self) {
+			return new Factory(function() use ($self, $factory) { return call_user_func($factory, $self); });
+		};
+	}
+
 	public function createFactory($factory)
 	{
 		return new Factory($factory);

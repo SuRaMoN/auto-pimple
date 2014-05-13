@@ -135,5 +135,29 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$service = $c['fixture_classes.service_with_unfulfillable_dependencies'];
 		$this->assertEquals(1, $service->getValue());
 	}
+
+	/** @test */
+	public function testOverwriteAlias()
+	{
+		$c = new AutoPimple();
+		$c['constant-1'] = 1;
+		$c['constant-2'] = 2;
+		$c->alias('1+1', 'constant-1');
+		$c->alias('1+1', 'constant-2');
+		$this->assertEquals(2, $c['1+1']);
+	}
+
+	/** @test */
+	public function testFactoryHelperMethod()
+	{
+		$c = new AutoPimple();
+		$c['array_factory'] = $c->share($c->factory(function($c) {
+			return new ArrayObject();
+		}));
+		$firstArray = $c['array_factory']->newInstance();
+		$secondArray = $c['array_factory']->newInstance();
+		$this->assertTrue($firstArray instanceof ArrayObject);
+		$this->assertNotSame($firstArray, $secondArray);
+	}
 }
  
