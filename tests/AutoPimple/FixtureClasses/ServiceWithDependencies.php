@@ -19,6 +19,11 @@ class ServiceWithDependencies
 		return 'ServiceWithDependencies';
 	}
 
+	public function getDependency()
+	{
+		return $this->dependency;
+	}
+
 	public function getDependenciesNames()
 	{
 		return array($this->dependency->getName());

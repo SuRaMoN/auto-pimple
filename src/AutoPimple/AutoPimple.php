@@ -31,8 +31,8 @@ class AutoPimple extends Pimple
 	public function autoFactory($className)
 	{
 		$serviceReflector = new ReflectionClass($className);
-		$underscoreName = $this->underscore($className);
-		$factoryCallback = $this->factoryCallbackFromReflectorOrNull($serviceReflector);
+		$underscoreName = StringUtil::underscore($className);
+		$factoryCallback = $this->serviceFactoryFromReflector($serviceReflector);
 		if(null === $factoryCallback) {
             throw new InvalidArgumentException('Unable to create factory for this class');
 		}
@@ -72,7 +72,30 @@ class AutoPimple extends Pimple
 		};
 	}
 
+	public function getModified($id, array $modifiedInjectables = array())
+	{
+		list($prefixedId, $service) = $this->serviceFactoryAndNameFromPartialServiceId($id, $modifiedInjectables);
+        if(null === $prefixedId) {
+            throw new InvalidArgumentException(sprintf('Identifier "%s" is not defined.', $id));
+        }
+        $isFactory = is_object($service) && method_exists($service, '__invoke');
+        return $isFactory ? $service($this) : $service;
+	}
+
     public function offsetExists($id)
+	{
+		list($prefixedId, $serviceFactory) = $this->serviceFactoryAndNameFromPartialServiceId($id);
+		if(null === $prefixedId) {
+			return false;
+		}
+		if(! array_key_exists($prefixedId, $this->values)) {
+			$this->offsetSet($prefixedId, $this->share($serviceFactory));
+		}
+		$this->alias($id, $prefixedId);
+		return true;
+	}
+
+	protected function serviceFactoryAndNameFromPartialServiceId($id, array $modifiedInjectables = array())
 	{
 		foreach($this->prefixMap as $to => $froms) {
 			foreach((array) $froms as $from) {
@@ -81,28 +104,25 @@ class AutoPimple extends Pimple
 				}
 				$prefixedId = $from . substr($id, strlen($to));
 				if(array_key_exists($prefixedId, $this->values)) {
-					$this->alias($id, $prefixedId);
-					return true;
+					return array($prefixedId, $this->values[$prefixedId]);
 				}
 			}
 		}
 
 		foreach($this->prefixMap as $to => $froms) {
 			foreach((array) $froms as $from) {
-				if($from != '' && strpos($id, $from) !== 0) {
+				if('' != $from && strpos($id, $from) !== 0) {
 					continue;
 				}
 				$prefixedId = $to . substr($id, strlen($from));
-				if(! array_key_exists($prefixedId, $this->values)) {
-					$this->tryAutoRegisterServiceFromFullServiceName($prefixedId);
-				}
-				if(array_key_exists($prefixedId, $this->values)) {
-					$this->alias($id, $prefixedId);
-					return true;
+				$serviceFactory = $this->serviceFactoryFromFullServiceName($prefixedId, $modifiedInjectables);
+				if(null !== $serviceFactory) {
+					return array($prefixedId, $serviceFactory);
 				}
 			}
 		}
-		return false;
+
+		return array(null, null);
 	}
 
     public function offsetGet($id)
@@ -111,66 +131,34 @@ class AutoPimple extends Pimple
 		return parent::offsetGet($id);
 	}
 
-	protected function camelize($name)
-	{
-		$name = preg_replace_callback('/(\.|__|_|-|^)(.)/', function($m) {
-			$name = ('.' == $m[1] ? '\\' : '');
-			if($m['1'] == '__') {
-				return $name . '_' . strtoupper($m[2]);
-			} else {
-				return $name . ('-' == $m[1] ? $m[2] : strtoupper($m[2]));
-			}
-		}, $name);
-		return $name;
-	}
-
-	protected function underscore($name)
-	{
-		$name = str_replace('\\', '.', $name);
-		$name = preg_replace_callback('/(?<!^|\.)[A-Z]/', function($m) {
-			return '_' . $m[0];
-		}, $name);
-		$name = preg_replace_callback('/(^|\.)([a-z])/', function($m) {
-			return '-' . $m[2];
-		}, $name);
-		return strtolower($name);
-	}
-
-	protected function tryAutoRegisterServiceFromFullServiceName($id)
+	protected function serviceFactoryFromFullServiceName($id, array $modifiedInjectables = array())
 	{
 		if(parent::offsetExists($id)) {
 			return;
 		}
-		$className = $this->camelize($id);
+		$className = StringUtil::camelize($id);
 		if(class_exists($className)) {
-			return $this->tryAutoRegisterServiceFromClassName($className, self::NON_FACTORY, $id);
+			return $this->serviceFactoryFromClassName($className, self::NON_FACTORY, $id, $modifiedInjectables);
 		}
 		if(substr($id, -8) == '.factory') {
-			$className = $this->camelize(substr($id, 0, -8));
+			$className = StringUtil::camelize(substr($id, 0, -8));
 			if(class_exists($className)) {
-				return $this->tryAutoRegisterServiceFromClassName($className, self::FACTORY, substr($id, 0, -8));
+				return $this->serviceFactoryFromClassName($className, self::FACTORY, substr($id, 0, -8), $modifiedInjectables);
 			}
 		}
 	}
 
-	protected function tryAutoRegisterServiceFromClassName($className, $isFactory, $serviceName = null)
+	protected function serviceFactoryFromClassName($className, $isFactory, $serviceName = null, array $modifiedInjectables = array())
 	{
 		$serviceReflector = new ReflectionClass($className);
-		$underscoreName = $this->underscore($className);
-		$serviceFactoryCallback = $this->factoryCallbackFromReflectorOrNull($serviceReflector, $serviceName);
+		$serviceFactoryCallback = $this->serviceFactoryFromReflector($serviceReflector, $serviceName, $modifiedInjectables);
 		if(null === $serviceFactoryCallback) {
-			return;
+			return null;
 		}
-		if($isFactory) {
-			$this->offsetSet($underscoreName . '.factory', $this->share(function () use ($serviceFactoryCallback) {
-				return new Factory($serviceFactoryCallback);
-			}));
-		} else {
-			$this->offsetSet($underscoreName, $this->share($serviceFactoryCallback));
-		}
+		return $isFactory ? function () use ($serviceFactoryCallback) { return new Factory($serviceFactoryCallback); } : $serviceFactoryCallback;
 	}
 
-	public function factoryCallbackFromReflectorOrNull(ReflectionClass $serviceReflector, $serviceName = null)
+	public function serviceFactoryFromReflector(ReflectionClass $serviceReflector, $serviceName = null, array $modifiedInjectables = array())
 	{
 		if(! $serviceReflector->hasMethod('__construct')) {
 			$dependencies = array();
@@ -179,7 +167,11 @@ class AutoPimple extends Pimple
 
 			$dependencies = array();
 			foreach($constructorReflector->getParameters() as $parameter) {
-				$underscoredParameterName = $this->underscore(ucfirst($parameter->getName()));
+				$underscoredParameterName = StringUtil::underscore(ucfirst($parameter->getName()));
+				if(array_key_exists($underscoredParameterName, $modifiedInjectables)) {
+					$dependencies[] = $modifiedInjectables[$underscoredParameterName];
+					continue;
+				}
 				if(null !== $serviceName && $this->offsetExists("$serviceName.$underscoredParameterName")) {
 					$dependencies[] = $this->offsetGet("$serviceName.$underscoredParameterName");
 					continue;
@@ -191,7 +183,7 @@ class AutoPimple extends Pimple
 				if(null === $typeHintClass) {
 					return null;
 				}
-				$underscoreName = $this->underscore($typeHintClass->getName());
+				$underscoreName = StringUtil::underscore($typeHintClass->getName());
 				if(! $this->offsetExists($underscoreName)) {
 					return null;
 				}
