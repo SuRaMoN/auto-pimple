@@ -134,7 +134,7 @@ class AutoPimple extends Pimple
 	protected function serviceFactoryFromFullServiceName($id, array $modifiedInjectables = array())
 	{
 		if(parent::offsetExists($id)) {
-			return;
+			return $this->values[$id];
 		}
 		$className = StringUtil::camelize($id);
 		if(class_exists($className)) {
