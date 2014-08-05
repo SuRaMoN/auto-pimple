@@ -24,10 +24,28 @@ class AutoPimple extends Pimple
 
     public function extend($id, $callable)
     {
-		$this->offsetExists($id);
-		return parent::extend($id, $callable);
+		$hasDefinedService = array_key_exists($id, $this->values);
+		$baseService = $hasDefinedService ? $this->values[$id] : null;
+		$self = $this;
+		return $this->values[$id] = new ExtendedService($id, $baseService, $callable, $hasDefinedService, $this);
 	}
 
+    public static function share($callable)
+    {
+        if (!is_object($callable) || !method_exists($callable, '__invoke')) {
+            throw new InvalidArgumentException('Service definition is not a Closure or invokable object.');
+        }
+
+        return function ($c) use ($callable) {
+            static $object;
+
+            if (null === $object) {
+                $object = $callable($c);
+            }
+
+            return $object;
+        };
+    }
 	public function autoFactory($className)
 	{
 		$serviceReflector = new ReflectionClass($className);
@@ -128,7 +146,30 @@ class AutoPimple extends Pimple
     public function offsetGet($id)
 	{
 		$this->offsetExists($id);
-		return parent::offsetGet($id);
+		if(array_key_exists($id, $this->values) && $this->values[$id] instanceof ExtendedService) {
+			return $this->getExtendedService($this->values[$id]);
+		} else {
+			return parent::offsetGet($id);
+		}
+	}
+
+	public function getExtendedService(ExtendedService $sharedService)
+	{
+		$id = $sharedService->getId();
+		$originalService = $this->values[$id];
+		$this->values[$id] = $sharedService;
+		while($this->values[$id] instanceof ExtendedService) {
+			$extender = $this->values[$id]->getExtender();
+			if($this->values[$id]->getHasDefinedService()) {
+				$this->values[$id] = $this->values[$id]->getBaseService();
+			} else {
+				unset($this->values[$id]);
+			}
+			$this->values[$id] = $extender($this->offsetGet($id), $this);
+		}
+		$service = $this->values[$id];
+		$this->values[$id] = $originalService;
+		return $service;
 	}
 
 	protected function serviceFactoryFromFullServiceName($id, array $modifiedInjectables = array())
