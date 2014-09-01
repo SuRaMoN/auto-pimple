@@ -115,14 +115,16 @@ class AutoPimple extends Pimple
 
 	protected function serviceFactoryAndNameFromPartialServiceId($id, array $modifiedInjectables = array())
 	{
-		foreach($this->prefixMap as $to => $froms) {
-			foreach((array) $froms as $from) {
-				if($to != '' && strpos($id, $to) !== 0) {
-					continue;
-				}
-				$prefixedId = $from . substr($id, strlen($to));
-				if(array_key_exists($prefixedId, $this->values)) {
-					return array($prefixedId, $this->values[$prefixedId]);
+		if(count($modifiedInjectables) == 0) {
+			foreach($this->prefixMap as $to => $froms) {
+				foreach((array) $froms as $from) {
+					if($to != '' && strpos($id, $to) !== 0) {
+						continue;
+					}
+					$prefixedId = $from . substr($id, strlen($to));
+					if(array_key_exists($prefixedId, $this->values)) {
+						return array($prefixedId, $this->values[$prefixedId]);
+					}
 				}
 			}
 		}
@@ -174,7 +176,7 @@ class AutoPimple extends Pimple
 
 	protected function serviceFactoryFromFullServiceName($id, array $modifiedInjectables = array())
 	{
-		if(parent::offsetExists($id)) {
+		if(parent::offsetExists($id) && count($modifiedInjectables) == 0) {
 			return $this->values[$id];
 		}
 		$className = StringUtil::camelize($id);
