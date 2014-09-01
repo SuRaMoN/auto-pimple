@@ -138,6 +138,15 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 	}
 
 	/** @test */
+	public function testInjectingParamatersWithDefaultValues()
+	{
+		$c = new AutoPimple(array('auto_pimple.' => ''));
+		$c['fixture_classes.service_with_default_value.other_value'] = 1;
+		$service = $c['fixture_classes.service_with_default_value'];
+		$this->assertEquals(1, $service->getOtherValue());
+	}
+
+	/** @test */
 	public function testOverwriteAlias()
 	{
 		$c = new AutoPimple();

@@ -218,7 +218,8 @@ class AutoPimple extends Pimple
 					continue;
 				}
 				if($parameter->isDefaultValueAvailable()) {
-					break;
+					$dependencies[] = $parameter->getDefaultValue();
+					continue;
 				}
 				$typeHintClass = $parameter->getClass();
 				if(null === $typeHintClass) {
