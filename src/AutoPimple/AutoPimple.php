@@ -10,9 +10,6 @@ use ReflectionMethod;
 
 class AutoPimple extends Pimple
 {
-	const FACTORY = true;
-	const NON_FACTORY = false;
-
 	protected $prefixMap;
 	protected $aliases = array();
 
@@ -46,6 +43,10 @@ class AutoPimple extends Pimple
             return $object;
         };
     }
+
+	/**
+	 * Creates a factory for a given classname and this factory will use auto-injection
+	 */
 	public function autoFactory($className)
 	{
 		$serviceReflector = new ReflectionClass($className);
@@ -70,6 +71,14 @@ class AutoPimple extends Pimple
 		return new Factory($factory);
 	}
 
+	public function createServiceFactory($serviceId, array $arguments = array())
+	{
+		$self = $this;
+		return new Factory(function(array $arguments = array()) use ($self, $serviceId) {
+			return $self->getModified($serviceId, $arguments);
+		});
+	}
+
 	public function alias($from, $to)
 	{
 		$pairKey = serialize(array($from, $to));
@@ -90,6 +99,14 @@ class AutoPimple extends Pimple
 		};
 	}
 
+	/**
+	 * The same as offsetGet(), but is accepts a an extra parameter that is a array of values that
+	 * can be injected in the constructor of the service.
+	 * eg. if there a class A { function __construct(B b, C c) .. }, autopimple will try to auto-inject
+	 * the parameters b and c. If you want non default parameters you can specify them like this:
+	 * getModified('a', array('c' => $otherC));
+	 * The c parameter will be injected with the $otherC variable and b will be auto-injected like always
+	 */
 	public function getModified($id, array $modifiedInjectables = array())
 	{
 		list($prefixedId, $service) = $this->serviceFactoryAndNameFromPartialServiceId($id, $modifiedInjectables);
@@ -111,6 +128,16 @@ class AutoPimple extends Pimple
 		}
 		$this->alias($id, $prefixedId);
 		return true;
+	}
+
+    public function offsetGet($id)
+	{
+		$this->offsetExists($id);
+		if(array_key_exists($id, $this->values) && $this->values[$id] instanceof ExtendedService) {
+			return $this->getExtendedService($this->values[$id]);
+		} else {
+			return parent::offsetGet($id);
+		}
 	}
 
 	protected function serviceFactoryAndNameFromPartialServiceId($id, array $modifiedInjectables = array())
@@ -145,16 +172,6 @@ class AutoPimple extends Pimple
 		return array(null, null);
 	}
 
-    public function offsetGet($id)
-	{
-		$this->offsetExists($id);
-		if(array_key_exists($id, $this->values) && $this->values[$id] instanceof ExtendedService) {
-			return $this->getExtendedService($this->values[$id]);
-		} else {
-			return parent::offsetGet($id);
-		}
-	}
-
 	public function getExtendedService(ExtendedService $sharedService)
 	{
 		$id = $sharedService->getId();
@@ -181,24 +198,25 @@ class AutoPimple extends Pimple
 		}
 		$className = StringUtil::camelize($id);
 		if(class_exists($className)) {
-			return $this->serviceFactoryFromClassName($className, self::NON_FACTORY, $id, $modifiedInjectables);
+			return $this->serviceFactoryFromClassName($className, $id, $modifiedInjectables);
 		}
 		if(substr($id, -8) == '.factory') {
-			$className = StringUtil::camelize(substr($id, 0, -8));
-			if(class_exists($className)) {
-				return $this->serviceFactoryFromClassName($className, self::FACTORY, substr($id, 0, -8), $modifiedInjectables);
-			}
+			$self = $this;
+			$serviceId = substr($id, 0, -8);
+			return function () use ($self, $serviceId) {
+				return $self->createServiceFactory($serviceId);
+			};
 		}
 	}
 
-	protected function serviceFactoryFromClassName($className, $isFactory, $serviceName = null, array $modifiedInjectables = array())
+	protected function serviceFactoryFromClassName($className, $serviceName = null, array $modifiedInjectables = array())
 	{
 		$serviceReflector = new ReflectionClass($className);
 		$serviceFactoryCallback = $this->serviceFactoryFromReflector($serviceReflector, $serviceName, $modifiedInjectables);
 		if(null === $serviceFactoryCallback) {
 			return null;
 		}
-		return $isFactory ? function () use ($serviceFactoryCallback) { return new Factory($serviceFactoryCallback); } : $serviceFactoryCallback;
+		return $serviceFactoryCallback;
 	}
 
 	public function serviceFactoryFromReflector(ReflectionClass $serviceReflector, $serviceName = null, array $modifiedInjectables = array())

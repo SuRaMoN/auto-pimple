@@ -109,7 +109,15 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 	}
 
 	/** @test */
-	public function testInjectParamatersIntoFactoryByServiceName()
+	public function testFactoryByServiceNameWithCustomParameters()
+	{
+		$c = new AutoPimple();
+		$serviceFactory = $c['auto_pimple.fixture_classes.service_with_default_value.factory'];
+		$this->assertEquals('success', $serviceFactory->newInstance(array('value' => 'success'))->getValue());
+	}
+
+	/** @test */
+	public function testInjectParametersIntoFactoryByServiceName()
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$c['fixture_classes.service_with_unfulfillable_dependencies.value'] = 1;
