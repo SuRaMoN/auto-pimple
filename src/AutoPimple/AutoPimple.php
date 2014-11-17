@@ -87,7 +87,7 @@ class AutoPimple extends Pimple
 			return;
 		}
 		$self = $this;
-		$this->values[$from] = $this->aliases[$pairKey] = function() use ($self, $to) { return $self[$to]; };
+		$this->values[$from] = $this->aliases[$pairKey] = new AliasedService($to);
 	}
 
 	public function serviceMethod($serviceId, $methodName)
@@ -135,6 +135,8 @@ class AutoPimple extends Pimple
 		$this->offsetExists($id);
 		if(array_key_exists($id, $this->values) && $this->values[$id] instanceof ExtendedService) {
 			return $this->getExtendedService($this->values[$id]);
+		} else if(array_key_exists($id, $this->values) && $this->values[$id] instanceof AliasedService) {
+			return $this->offsetGet($this->values[$id]->getTarget());
 		} else {
 			return parent::offsetGet($id);
 		}

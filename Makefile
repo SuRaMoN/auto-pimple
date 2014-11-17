@@ -1,5 +1,5 @@
 
-.PHONY: run-tests recent-composer install-vendor update-vendor clean
+.PHONY: test recent-composer install-vendor update-vendor clean
 
 install-vendor: recent-composer
 	bin/composer.phar install
@@ -7,7 +7,7 @@ install-vendor: recent-composer
 vendor/autoload.php: recent-composer
 	bin/composer.phar install
 
-run-tests: vendor/autoload.php
+test: vendor/autoload.php
 	vendor/bin/phpunit
 
 update-vendor: recent-composer
