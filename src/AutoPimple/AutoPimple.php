@@ -10,13 +10,27 @@ use ReflectionMethod;
 
 class AutoPimple extends Pimple
 {
+	protected $cacheFolder;
+	protected $cacheData = array();
 	protected $prefixMap;
 	protected $aliases = array();
 
-	public function __construct(array $prefixMap = array(), array $values = array())
+	public function __construct(array $prefixMap = array(), array $values = array(), $cacheFolder = null)
 	{
+		$this->cacheFolder = $cacheFolder;
+		if(null !== $cacheFolder && is_file("{$this->cacheFolder}/autopimple")) {
+			$this->cacheData = unserialize(file_get_contents("{$this->cacheFolder}/autopimple"));
+		}
 		$this->prefixMap = array_merge(array('' => ''), $prefixMap);
 		parent::__construct($values);
+	}
+
+	public function writeCache($key, $value)
+	{
+		$this->cacheData[$key] = $value;
+		if(null !== $this->cacheFolder && is_dir($this->cacheFolder)) {
+			file_put_contents("{$this->cacheFolder}/autopimple", serialize($this->cacheData));
+		}
 	}
 
     public function extend($id, $callable)
@@ -164,6 +178,9 @@ class AutoPimple extends Pimple
 					continue;
 				}
 				$prefixedId = $to . substr($id, strlen($from));
+				if(array_key_exists("no_service_for:$prefixedId", $this->cacheData)) {
+					continue;
+				}
 				$serviceFactory = $this->serviceFactoryFromFullServiceName($prefixedId, $modifiedInjectables);
 				if(null !== $serviceFactory) {
 					return array($prefixedId, $serviceFactory);
@@ -209,6 +226,7 @@ class AutoPimple extends Pimple
 				return $self->createServiceFactory($serviceId);
 			};
 		}
+		$this->writeCache("no_service_for:$id", true);
 	}
 
 	protected function serviceFactoryFromClassName($className, $serviceName = null, array $modifiedInjectables = array())
