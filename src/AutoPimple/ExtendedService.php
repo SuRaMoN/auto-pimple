@@ -2,7 +2,6 @@
 
 namespace AutoPimple;
 
-
 class ExtendedService
 {
 	protected $pimple;
@@ -34,15 +33,14 @@ class ExtendedService
  	{
  		return $this->hasDefinedService;
  	}
- 
+
  	public function getBaseService()
  	{
  		return $this->baseService;
  	}
- 
+
  	public function getId()
  	{
  		return $this->id;
  	}
 }
- 
