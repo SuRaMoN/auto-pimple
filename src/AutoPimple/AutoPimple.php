@@ -281,7 +281,11 @@ class AutoPimple extends Pimple
         }
 
         return function() use ($serviceReflector, $dependencies) {
-            return $serviceReflector->newInstanceArgs($dependencies);
+            if (count($dependencies) == 0) {
+                return $serviceReflector->newInstance();
+            } else {
+                return $serviceReflector->newInstanceArgs($dependencies);
+            }
         };
     }
 }
