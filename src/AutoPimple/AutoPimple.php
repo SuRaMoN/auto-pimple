@@ -65,6 +65,13 @@ class AutoPimple extends Pimple
         return new Factory($factoryCallback);
     }
 
+    public function lazy($serviceId)
+    {
+        return function () use ($serviceId) {
+            return $this->offsetGet($serviceId);
+        };
+    }
+
     public function factory($factory)
     {
         $self = $this;
