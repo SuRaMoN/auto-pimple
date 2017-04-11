@@ -65,6 +65,13 @@ class AutoPimple extends Pimple
         return new Factory($factoryCallback);
     }
 
+    public function lazyModified($serviceId, array $arguments)
+    {
+        return function () use ($serviceId, $arguments) {
+            return $this->getModified($serviceId, $arguments);
+        };
+    }
+
     public function lazy($serviceId)
     {
         return function () use ($serviceId) {
