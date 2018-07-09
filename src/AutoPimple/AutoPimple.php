@@ -2,19 +2,29 @@
 
 namespace AutoPimple;
 
+use Exception;
 use InvalidArgumentException;
 use Pimple;
 use ReflectionClass;
-use ReflectionMethod;
 
+/**
+ * Extension for pimple allowing auto-wiring
+ */
 class AutoPimple extends Pimple
 {
-    protected $cacheFolder;
-    protected $cacheData = array();
-    protected $prefixMap;
-    protected $aliases = array();
+    /** @var string */
+    private $cacheFolder;
 
-    public function __construct(array $prefixMap = array(), array $values = array(), $cacheFolder = null)
+    /** @var array<string,string> */
+    private $cacheData = [];
+
+    /** @var array<string,string> */
+    private $prefixMap;
+
+    /** @var array<string,string> */
+    private $aliases = [];
+
+    public function __construct(array $prefixMap = [], array $values = [], $cacheFolder = null)
     {
         parent::__construct($values);
         $this->cacheFolder = $cacheFolder;
@@ -22,18 +32,24 @@ class AutoPimple extends Pimple
             $this->cacheData = @include("{$this->cacheFolder}/autopimple.php");
         }
         if (false === $this->cacheData) {
-            $this->cacheData = array();
+            $this->cacheData = [];
         }
-        $this->prefixMap = array_merge(array('' => ''), $prefixMap);
+        $this->prefixMap = array_merge(['' => ''], $prefixMap);
     }
 
-    public function extend($id, $callable)
+    /**
+     * {@inheritdoc}
+     */
+    public function extend($id, $callable): ExtendedService
     {
         $hasDefinedService = array_key_exists($id, $this->values);
         $baseService = $hasDefinedService ? $this->values[$id] : null;
         return $this->values[$id] = new ExtendedService($id, $baseService, $callable, $hasDefinedService, $this);
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public static function share($callable)
     {
         if (! is_object($callable) || ! method_exists($callable, '__invoke')) {
@@ -49,6 +65,22 @@ class AutoPimple extends Pimple
 
             return $object;
         };
+    }
+
+    public function get(string $className)
+    {
+        $serviceName = StringUtil::underscore($className);
+        foreach ($this->prefixMap as $prefix => $newPrefix) {
+            if ('' != $prefix && strpos($serviceName, $prefix) === 0) {
+                $serviceName = $newPrefix . substr($serviceName, strlen($prefix));
+                break;
+            }
+        }
+        $service = $this->offsetGet($serviceName);
+        if (!$service instanceof $className) {
+            throw new Exception('Expected service of class "' . $className . '"');
+        }
+        return $service;
     }
 
     /**
@@ -92,19 +124,20 @@ class AutoPimple extends Pimple
         return new Factory($factory);
     }
 
-    public function createServiceFactory($serviceId, array $arguments = array())
+    public function createServiceFactory($serviceId, array $arguments = [])
     {
         $self = $this;
-        return new Factory(function(array $arguments = array()) use ($self, $serviceId) {
+        return new Factory(function(array $arguments = []) use ($self, $serviceId) {
             return $self->getModified($serviceId, $arguments);
         });
     }
 
     public function alias($from, $to)
     {
-        $pairKey = serialize(array($from, $to));
+        $pairKey = serialize([$from, $to]);
         if ($from == $to || (array_key_exists($from, $this->values) && array_key_exists($pairKey, $this->aliases) &&
-                $this->values[$from] === $this->aliases[$pairKey])) {
+                $this->values[$from] === $this->aliases[$pairKey])
+        ) {
             return;
         }
         $self = $this;
@@ -116,7 +149,7 @@ class AutoPimple extends Pimple
         $self = $this;
         return function() use ($self, $serviceId, $methodName) {
             $arguments = func_get_args();
-            return call_user_func_array(array($self->offsetGet($serviceId), $methodName), $arguments);
+            return call_user_func_array([$self->offsetGet($serviceId), $methodName], $arguments);
         };
     }
 
@@ -128,7 +161,7 @@ class AutoPimple extends Pimple
      * getModified('a', array('c' => $otherC));
      * The c parameter will be injected with the $otherC variable and b will be auto-injected like always
      */
-    public function getModified($id, array $modifiedInjectables = array())
+    public function getModified($id, array $modifiedInjectables = [])
     {
         list($prefixedId, $service) = $this->serviceFactoryAndNameFromPartialServiceId($id, $modifiedInjectables);
         if (null === $prefixedId) {
@@ -138,6 +171,9 @@ class AutoPimple extends Pimple
         return $isFactory ? $service($this) : $service;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function offsetExists($id)
     {
         list($prefixedId, $serviceFactory) = $this->serviceFactoryAndNameFromPartialServiceId($id);
@@ -151,12 +187,15 @@ class AutoPimple extends Pimple
         return true;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function offsetGet($id)
     {
         $this->offsetExists($id);
         if (array_key_exists($id, $this->values) && $this->values[$id] instanceof ExtendedService) {
             return $this->getExtendedService($this->values[$id]);
-        } else if (array_key_exists($id, $this->values) && $this->values[$id] instanceof AliasedService) {
+        } elseif (array_key_exists($id, $this->values) && $this->values[$id] instanceof AliasedService) {
             return $this->offsetGet($this->values[$id]->getTarget());
         } else {
             return parent::offsetGet($id);
@@ -168,7 +207,7 @@ class AutoPimple extends Pimple
         $id = $sharedService->getId();
         $originalService = $this->values[$id];
         $this->values[$id] = $sharedService;
-        while($this->values[$id] instanceof ExtendedService) {
+        while ($this->values[$id] instanceof ExtendedService) {
             $extender = $this->values[$id]->getExtender();
             if ($this->values[$id]->getHasDefinedService()) {
                 $this->values[$id] = $this->values[$id]->getBaseService();
@@ -196,17 +235,17 @@ class AutoPimple extends Pimple
         }
     }
 
-    protected function serviceFactoryAndNameFromPartialServiceId($id, array $modifiedInjectables = array())
+    protected function serviceFactoryAndNameFromPartialServiceId($id, array $modifiedInjectables = [])
     {
         if (count($modifiedInjectables) == 0) {
             foreach ($this->prefixMap as $to => $froms) {
                 foreach ((array) $froms as $from) {
-                    if ($to != '' && strpos($id, $to) !== 0) {
+                    if ('' != $to && strpos($id, $to) !== 0) {
                         continue;
                     }
                     $prefixedId = $from . substr($id, strlen($to));
                     if (array_key_exists($prefixedId, $this->values)) {
-                        return array($prefixedId, $this->values[$prefixedId]);
+                        return [$prefixedId, $this->values[$prefixedId]];
                     }
                 }
             }
@@ -223,15 +262,15 @@ class AutoPimple extends Pimple
                 }
                 $serviceFactory = $this->serviceFactoryFromFullServiceName($prefixedId, $modifiedInjectables);
                 if (null !== $serviceFactory) {
-                    return array($prefixedId, $serviceFactory);
+                    return [$prefixedId, $serviceFactory];
                 }
             }
         }
 
-        return array(null, null);
+        return [null, null];
     }
 
-    protected function serviceFactoryFromFullServiceName($id, array $modifiedInjectables = array())
+    protected function serviceFactoryFromFullServiceName($id, array $modifiedInjectables = [])
     {
         if (parent::offsetExists($id) && count($modifiedInjectables) == 0) {
             return $this->values[$id];
@@ -250,7 +289,7 @@ class AutoPimple extends Pimple
         $this->writeCache("no_class:$id", true);
     }
 
-    protected function serviceFactoryFromClassName($className, $serviceName = null, array $modifiedInjectables = array())
+    protected function serviceFactoryFromClassName($className, $serviceName = null, array $modifiedInjectables = [])
     {
         $serviceReflector = new ReflectionClass($className);
         $serviceFactoryCallback = $this->serviceFactoryFromReflector($serviceReflector, $serviceName, $modifiedInjectables);
@@ -260,14 +299,14 @@ class AutoPimple extends Pimple
         return $serviceFactoryCallback;
     }
 
-    protected function serviceFactoryFromReflector(ReflectionClass $serviceReflector, $serviceName = null, array $modifiedInjectables = array())
+    protected function serviceFactoryFromReflector(ReflectionClass $serviceReflector, $serviceName = null, array $modifiedInjectables = [])
     {
         if (! $serviceReflector->hasMethod('__construct')) {
-            $dependencies = array();
+            $dependencies = [];
         } else {
             $constructorReflector = $serviceReflector->getMethod('__construct');
 
-            $dependencies = array();
+            $dependencies = [];
             foreach ($constructorReflector->getParameters() as $parameter) {
                 $underscoredParameterName = StringUtil::underscore(ucfirst($parameter->getName()));
                 if (array_key_exists($underscoredParameterName, $modifiedInjectables)) {

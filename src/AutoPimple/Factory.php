@@ -2,9 +2,9 @@
 
 namespace AutoPimple;
 
-class Factory
+final class Factory
 {
-    protected $factoryCallback;
+    private $factoryCallback;
 
     public function __construct($factory)
     {
