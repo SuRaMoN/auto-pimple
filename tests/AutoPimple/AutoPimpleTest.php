@@ -43,7 +43,7 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 
 		try {
 			$c['true'];
-		} catch(InvalidArgumentException $e) {
+		} catch(NotFoundException $e) {
 			$hasFailed = true;
 		}
 		$this->assertTrue($hasFailed);

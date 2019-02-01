@@ -2,15 +2,14 @@
 
 namespace AutoPimple;
 
-use Exception;
-use InvalidArgumentException;
 use Pimple;
+use Psr\Container\ContainerInterface;
 use ReflectionClass;
 
 /**
  * Extension for pimple allowing auto-wiring
  */
-class AutoPimple extends Pimple
+class AutoPimple extends Pimple implements ContainerInterface
 {
     /** @var string */
     private $cacheFolder;
@@ -53,7 +52,7 @@ class AutoPimple extends Pimple
     public static function share($callable)
     {
         if (! is_object($callable) || ! method_exists($callable, '__invoke')) {
-            throw new InvalidArgumentException('Service definition is not a Closure or invokable object.');
+            throw new InvalidDefinitionException('Service definition is not a Closure or invokable object.');
         }
 
         return function ($c) use ($callable) {
@@ -67,9 +66,12 @@ class AutoPimple extends Pimple
         };
     }
 
-    public function get(string $className)
+    /**
+     * {@inheritdoc}
+     */
+    public function get($id)
     {
-        $serviceName = StringUtil::underscore($className);
+        $serviceName = StringUtil::underscore($id);
         foreach ($this->prefixMap as $prefix => $newPrefix) {
             if ('' != $prefix && strpos($serviceName, $prefix) === 0) {
                 $serviceName = $newPrefix . substr($serviceName, strlen($prefix));
@@ -77,8 +79,8 @@ class AutoPimple extends Pimple
             }
         }
         $service = $this->offsetGet($serviceName);
-        if (!$service instanceof $className) {
-            throw new Exception('Expected service of class "' . $className . '"');
+        if (!$service instanceof $id) {
+            throw new NotFoundException('Expected service of class "' . $id . '"');
         }
         return $service;
     }
@@ -89,10 +91,9 @@ class AutoPimple extends Pimple
     public function autoFactory($className)
     {
         $serviceReflector = new ReflectionClass($className);
-        $underscoreName = StringUtil::underscore($className);
         $factoryCallback = $this->serviceFactoryFromReflector($serviceReflector);
         if (null === $factoryCallback) {
-            throw new InvalidArgumentException('Unable to create factory for this class');
+            throw new InvalidFactoryException('Unable to create factory for this class ' . $className);
         }
         return new Factory($factoryCallback);
     }
@@ -140,7 +141,6 @@ class AutoPimple extends Pimple
         ) {
             return;
         }
-        $self = $this;
         $this->values[$from] = $this->aliases[$pairKey] = new AliasedService($to);
     }
 
@@ -160,12 +160,14 @@ class AutoPimple extends Pimple
      * the parameters b and c. If you want non default parameters you can specify them like this:
      * getModified('a', array('c' => $otherC));
      * The c parameter will be injected with the $otherC variable and b will be auto-injected like always
+     *
+     * @throws \AutoPimple\NotFoundException
      */
     public function getModified($id, array $modifiedInjectables = [])
     {
         list($prefixedId, $service) = $this->serviceFactoryAndNameFromPartialServiceId($id, $modifiedInjectables);
         if (null === $prefixedId) {
-            throw new InvalidArgumentException(sprintf('Identifier "%s" is not defined.', $id));
+            throw new NotFoundException(sprintf('Identifier "%s" is not defined.', $id));
         }
         $isFactory = is_object($service) && method_exists($service, '__invoke');
         return $isFactory ? $service($this) : $service;
@@ -198,7 +200,13 @@ class AutoPimple extends Pimple
         } elseif (array_key_exists($id, $this->values) && $this->values[$id] instanceof AliasedService) {
             return $this->offsetGet($this->values[$id]->getTarget());
         } else {
-            return parent::offsetGet($id);
+            try {
+                return parent::offsetGet($id);
+            } catch (\InvalidArgumentException $e) {
+                throw new NotFoundException($e->getMessage(), null, $e);
+            } catch (\Exception $e) {
+                throw new ContainerException($e->getMessage(), null, $e);
+            }
         }
     }
 
@@ -336,5 +344,21 @@ class AutoPimple extends Pimple
         return function() use ($serviceReflector, $dependencies) {
             return $serviceReflector->newInstanceArgs($dependencies);
         };
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function has($id)
+    {
+        $serviceName = StringUtil::underscore($id);
+        foreach ($this->prefixMap as $prefix => $newPrefix) {
+            if ('' != $prefix && strpos($serviceName, $prefix) === 0) {
+                $serviceName = $newPrefix . substr($serviceName, strlen($prefix));
+                break;
+            }
+        }
+
+        return $this->offsetExists($serviceName);
     }
 }
