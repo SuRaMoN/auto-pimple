@@ -11,7 +11,7 @@
     "require-dev": {
         "phpunit/phpunit": "3.7.*"
     },
-    "license": "DO WHAT THE FUCK YOU WANT LICENSE",
+    "license": "MIT",
     "authors": [
         {
             "name": "SuRaMoN",
