@@ -55,7 +55,7 @@ class AutoPimple extends Pimple implements ContainerInterface
             throw new InvalidDefinitionException('Service definition is not a Closure or invokable object.');
         }
 
-        return function ($c) use ($callable) {
+        return static function ($c) use ($callable) {
             static $object;
 
             if (null === $object) {
@@ -73,7 +73,7 @@ class AutoPimple extends Pimple implements ContainerInterface
     {
         $serviceName = StringUtil::underscore($id);
         foreach ($this->prefixMap as $prefix => $newPrefix) {
-            if ('' != $prefix && strpos($serviceName, $prefix) === 0) {
+            if ('' !== $prefix && strpos($serviceName, $prefix) === 0) {
                 $serviceName = $newPrefix . substr($serviceName, strlen($prefix));
                 break;
             }
@@ -88,7 +88,7 @@ class AutoPimple extends Pimple implements ContainerInterface
     /**
      * Creates a factory for a given classname and this factory will use auto-injection
      */
-    public function autoFactory($className)
+    public function autoFactory(string $className)
     {
         $serviceReflector = new ReflectionClass($className);
         $factoryCallback = $this->serviceFactoryFromReflector($serviceReflector);
@@ -112,11 +112,18 @@ class AutoPimple extends Pimple implements ContainerInterface
         };
     }
 
+    public function lazyGet(string $className)
+    {
+        return function () use ($className) {
+            return $this->get($className);
+        };
+    }
+
     public function factory($factory)
     {
         $self = $this;
-        return function() use ($factory, $self) {
-            return new Factory(function() use ($self, $factory) { return call_user_func($factory, $self); });
+        return static function() use ($factory, $self) {
+            return new Factory(static function() use ($self, $factory) { return $factory($self); });
         };
     }
 
@@ -128,7 +135,7 @@ class AutoPimple extends Pimple implements ContainerInterface
     public function createServiceFactory($serviceId, array $arguments = [])
     {
         $self = $this;
-        return new Factory(function(array $arguments = []) use ($self, $serviceId) {
+        return new Factory(static function(array $arguments = []) use ($self, $serviceId) {
             return $self->getModified($serviceId, $arguments);
         });
     }
@@ -136,7 +143,7 @@ class AutoPimple extends Pimple implements ContainerInterface
     public function alias($from, $to)
     {
         $pairKey = serialize([$from, $to]);
-        if ($from == $to || (array_key_exists($from, $this->values) && array_key_exists($pairKey, $this->aliases) &&
+        if ($from === $to || (array_key_exists($from, $this->values) && array_key_exists($pairKey, $this->aliases) &&
                 $this->values[$from] === $this->aliases[$pairKey])
         ) {
             return;
@@ -147,7 +154,7 @@ class AutoPimple extends Pimple implements ContainerInterface
     public function serviceMethod($serviceId, $methodName)
     {
         $self = $this;
-        return function() use ($self, $serviceId, $methodName) {
+        return static function() use ($self, $serviceId, $methodName) {
             $arguments = func_get_args();
             return call_user_func_array([$self->offsetGet($serviceId), $methodName], $arguments);
         };
@@ -183,7 +190,7 @@ class AutoPimple extends Pimple implements ContainerInterface
             return false;
         }
         if (! array_key_exists($prefixedId, $this->values)) {
-            $this->offsetSet($prefixedId, $this->share($serviceFactory));
+            $this->offsetSet($prefixedId, self::share($serviceFactory));
         }
         $this->alias($id, $prefixedId);
         return true;
@@ -197,16 +204,18 @@ class AutoPimple extends Pimple implements ContainerInterface
         $this->offsetExists($id);
         if (array_key_exists($id, $this->values) && $this->values[$id] instanceof ExtendedService) {
             return $this->getExtendedService($this->values[$id]);
-        } elseif (array_key_exists($id, $this->values) && $this->values[$id] instanceof AliasedService) {
+        }
+
+        if (array_key_exists($id, $this->values) && $this->values[$id] instanceof AliasedService) {
             return $this->offsetGet($this->values[$id]->getTarget());
-        } else {
-            try {
-                return parent::offsetGet($id);
-            } catch (\InvalidArgumentException $e) {
-                throw new NotFoundException($e->getMessage(), null, $e);
-            } catch (\Exception $e) {
-                throw new ContainerException($e->getMessage(), null, $e);
-            }
+        }
+
+        try {
+            return parent::offsetGet($id);
+        } catch (\InvalidArgumentException $e) {
+            throw new NotFoundException($e->getMessage(), null, $e);
+        } catch (\Exception $e) {
+            throw new ContainerException($e->getMessage(), null, $e);
         }
     }
 
@@ -245,10 +254,10 @@ class AutoPimple extends Pimple implements ContainerInterface
 
     protected function serviceFactoryAndNameFromPartialServiceId($id, array $modifiedInjectables = [])
     {
-        if (count($modifiedInjectables) == 0) {
+        if (count($modifiedInjectables) === 0) {
             foreach ($this->prefixMap as $to => $froms) {
                 foreach ((array) $froms as $from) {
-                    if ('' != $to && strpos($id, $to) !== 0) {
+                    if ('' !== $to && strpos($id, $to) !== 0) {
                         continue;
                     }
                     $prefixedId = $from . substr($id, strlen($to));
@@ -261,7 +270,7 @@ class AutoPimple extends Pimple implements ContainerInterface
 
         foreach ($this->prefixMap as $to => $froms) {
             foreach ((array) $froms as $from) {
-                if ('' != $from && strpos($id, $from) !== 0) {
+                if ('' !== $from && strpos($id, $from) !== 0) {
                     continue;
                 }
                 $prefixedId = $to . substr($id, strlen($from));
@@ -280,17 +289,17 @@ class AutoPimple extends Pimple implements ContainerInterface
 
     protected function serviceFactoryFromFullServiceName($id, array $modifiedInjectables = [])
     {
-        if (parent::offsetExists($id) && count($modifiedInjectables) == 0) {
+        if (parent::offsetExists($id) && count($modifiedInjectables) === 0) {
             return $this->values[$id];
         }
         $className = StringUtil::camelize($id);
         if (class_exists($className)) {
             return $this->serviceFactoryFromClassName($className, $id, $modifiedInjectables);
         }
-        if (substr($id, -8) == '.factory') {
+        if (substr($id, -8) === '.factory') {
             $self = $this;
             $serviceId = substr($id, 0, -8);
-            return function () use ($self, $serviceId) {
+            return static function () use ($self, $serviceId) {
                 return $self->createServiceFactory($serviceId);
             };
         }
@@ -341,7 +350,7 @@ class AutoPimple extends Pimple implements ContainerInterface
             }
         }
 
-        return function() use ($serviceReflector, $dependencies) {
+        return static function() use ($serviceReflector, $dependencies) {
             return $serviceReflector->newInstanceArgs($dependencies);
         };
     }
@@ -353,7 +362,7 @@ class AutoPimple extends Pimple implements ContainerInterface
     {
         $serviceName = StringUtil::underscore($id);
         foreach ($this->prefixMap as $prefix => $newPrefix) {
-            if ('' != $prefix && strpos($serviceName, $prefix) === 0) {
+            if ('' !== $prefix && strpos($serviceName, $prefix) === 0) {
                 $serviceName = $newPrefix . substr($serviceName, strlen($prefix));
                 break;
             }
