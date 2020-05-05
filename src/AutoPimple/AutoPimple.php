@@ -68,6 +68,9 @@ class AutoPimple extends Pimple implements ContainerInterface
 
     /**
      * {@inheritdoc}
+     * @template T
+     * @param class-string<T> $type
+     * @return T
      */
     public function get($id)
     {
@@ -87,6 +90,10 @@ class AutoPimple extends Pimple implements ContainerInterface
 
     /**
      * Creates a factory for a given classname and this factory will use auto-injection
+     *
+     * @template T
+     * @param class-string<T> $type
+     * @return \AutoPimple\Factory<T>
      */
     public function autoFactory(string $className)
     {
@@ -112,6 +119,11 @@ class AutoPimple extends Pimple implements ContainerInterface
         };
     }
 
+    /**
+     * @template T
+     * @param class-string<T> $type
+     * @return callable:T
+     */
     public function lazyGet(string $className)
     {
         return function () use ($className) {

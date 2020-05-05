@@ -2,10 +2,16 @@
 
 namespace AutoPimple;
 
+/**
+* @template T
+*/
 final class Factory
 {
     private $factoryCallback;
 
+    /**
+     * @param class-string<T>|callable:T $type
+     */
     public function __construct($factory)
     {
         if (is_string($factory)) {
@@ -17,6 +23,9 @@ final class Factory
         }
     }
 
+    /**
+     * @return T
+     */
     public function newInstance()
     {
         $arguments = func_get_args();
