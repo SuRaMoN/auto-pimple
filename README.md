@@ -4,6 +4,7 @@ AutoPimple
 
 The [Pimple](https://github.com/silexphp/Pimple) DI container extended with auto-injection functionality
 
+![PHP Composer](https://github.com/SuRaMoN/auto-pimple/workflows/PHP%20Composer/badge.svg)
 [![Build Status](https://travis-ci.org/SuRaMoN/auto-pimple.png?branch=master)](https://travis-ci.org/SuRaMoN/auto-pimple)
 
 

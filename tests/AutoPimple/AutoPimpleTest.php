@@ -2,65 +2,61 @@
 
 namespace AutoPimple;
 
-use AutoPimple\FixtureClasses\SimpleServiceWithoutDependencies;
 use ArrayObject;
+use AutoPimple\FixtureClasses\SimpleServiceWithoutDependencies;
 use InvalidArgumentException;
-use PHPUnit_Framework_TestCase;
+use PHPUnit\Framework\TestCase;
+use AutoPimple\FixtureClasses\ServiceWithDependencies;
+use AutoPimple\FixtureClasses\ServiceWithUnfulfillableDependencies;
 
-
-class AutoPimpleTest extends PHPUnit_Framework_TestCase
+class AutoPimpleTest extends TestCase
 {
-	/** @test */
-	public function testNormalDependencyInjection()
-	{
-		$c = new AutoPimple();
-		$c['true'] = $c->share(function() { return true; });
-		$this->assertTrue($c['true']);
-	}
+    public function testNormalDependencyInjection(): void
+    {
+        $c = new AutoPimple();
+        $c['true'] = $c::share(static function () {return true;});
+        $this->assertTrue($c['true']);
+    }
 
-	/** @test */
-	public function testServiceMethod()
-	{
-		$c = new AutoPimple();
-		$c['array'] = new ArrayObject();
+    public function testServiceMethod(): void
+    {
+        $c = new AutoPimple();
+        $c['array'] = new ArrayObject();
 
-		$countFunction = $c->serviceMethod('array', 'count');
-		$this->assertEquals(0, $countFunction());
-		$c['array']->append(123);
-		$this->assertEquals(1, $countFunction());
+        $countFunction = $c->serviceMethod('array', 'count');
+        $this->assertEquals(0, $countFunction());
+        $c['array']->append(123);
+        $this->assertEquals(1, $countFunction());
 
-		$appendFunction = $c->serviceMethod('array', 'append');
-		$appendFunction(456);
-		$this->assertEquals(2, $countFunction());
-	}
+        $appendFunction = $c->serviceMethod('array', 'append');
+        $appendFunction(456);
+        $this->assertEquals(2, $countFunction());
+    }
 
-	/** @test */
-	public function testAlias()
-	{
-		$c = new AutoPimple();
-		$c->alias('true', 'false');
-		$hasFailed = false;
+    public function testAlias(): void
+    {
+        $c = new AutoPimple();
+        $c->alias('true', 'false');
+        $hasFailed = false;
 
-		try {
-			$c['true'];
-		} catch(NotFoundException $e) {
-			$hasFailed = true;
-		}
-		$this->assertTrue($hasFailed);
+        try {
+            $c['true'];
+        } catch (NotFoundException $e) {
+            $hasFailed = true;
+        }
+        $this->assertTrue($hasFailed);
 		$c['false'] = false;
 		$this->assertFalse($c['true']);
 	}
 
-	/** @test */
-	public function testSimpleAutoServiceLoading()
+    public function testSimpleAutoServiceLoading(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$service = $c['fixture_classes.simple_service_without_dependencies'];
 		$this->assertEquals('SimpleServiceWithoutDependencies', $service->getName());
 	}
 
-	/** @test */
-	public function testAutoServiceLoadingWithDependencies()
+    public function testAutoServiceLoadingWithDependencies(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$service = $c['fixture_classes.service_with_dependencies'];
@@ -68,56 +64,49 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals(array('SimpleServiceWithoutDependencies'), $service->getDependenciesNames());
 	}
 
-	/** @test */
-	public function testFactoryByClassName()
+    public function testFactoryByClassName(): void
 	{
 		$c = new AutoPimple();
 		$c['jos'] = $c->createFactory('stdClass');
-		$this->assertTrue($c['jos']->newInstance() instanceof \stdClass);
+		$this->assertInstanceOf(\stdClass::class, $c['jos']->newInstance());
 	}
 
-	/** @test */
-	public function testFactoryByCallback()
+    public function testFactoryByCallback(): void
 	{
 		$c = new AutoPimple();
-		$c['jos'] = $c->createFactory(function() { return new \stdClass(); });
-		$this->assertTrue($c['jos']->newInstance() instanceof \stdClass);
+		$c['jos'] = $c->createFactory(static function() { return new \stdClass(); });
+		$this->assertInstanceOf(\stdClass::class, $c['jos']->newInstance());
 	}
 
-	/** @test */
-	public function testDefaultValues()
+    public function testDefaultValues(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$service = $c['fixture_classes.service_with_default_value'];
 		$this->assertEquals(30, $service->getValue());
 	}
 
-	/** @test */
-	public function testAutoFactory()
+    public function testAutoFactory(): void
 	{
 		$c = new AutoPimple();
-		$serviceFactory = $c->autoFactory('AutoPimple\FixtureClasses\ServiceWithDependencies');
+		$serviceFactory = $c->autoFactory(ServiceWithDependencies::class);
 		$this->assertEquals('ServiceWithDependencies', $serviceFactory->newInstance()->getName());
 	}
 
-	/** @test */
-	public function testFactoryByServiceName()
+    public function testFactoryByServiceName(): void
 	{
 		$c = new AutoPimple();
 		$serviceFactory = $c['auto_pimple.fixture_classes.service_with_dependencies.factory'];
 		$this->assertEquals('ServiceWithDependencies', $serviceFactory->newInstance()->getName());
 	}
 
-	/** @test */
-	public function testFactoryByServiceNameWithCustomParameters()
+    public function testFactoryByServiceNameWithCustomParameters(): void
 	{
 		$c = new AutoPimple();
 		$serviceFactory = $c['auto_pimple.fixture_classes.service_with_default_value.factory'];
 		$this->assertEquals('success', $serviceFactory->newInstance(array('value' => 'success'))->getValue());
 	}
 
-	/** @test */
-	public function testInjectParametersIntoFactoryByServiceName()
+    public function testInjectParametersIntoFactoryByServiceName(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$c['fixture_classes.service_with_unfulfillable_dependencies.value'] = 1;
@@ -129,15 +118,14 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 	 * @test
 	 * @expectedException InvalidArgumentException
 	 */
-	public function testExceptionWithDependenciesAreUnfulfillable()
+	public function testExceptionWithDependenciesAreUnfulfillable(): void
 	{
 		$c = new AutoPimple();
-		$serviceFactory = $c->autoFactory('AutoPimple\FixtureClasses\ServiceWithUnfulfillableDependencies');
+		$serviceFactory = $c->autoFactory(ServiceWithUnfulfillableDependencies::class);
 		$serviceFactory->newInstance();
 	}
 
-	/** @test */
-	public function testInjectingParamaters()
+    public function testInjectingParamaters(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$c['fixture_classes.service_with_unfulfillable_dependencies.value'] = 1;
@@ -145,8 +133,7 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals(1, $service->getValue());
 	}
 
-	/** @test */
-	public function testInjectingParamatersWithDefaultValues()
+    public function testInjectingParamatersWithDefaultValues(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$c['fixture_classes.service_with_default_value.other_value'] = 1;
@@ -154,8 +141,7 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals(1, $service->getOtherValue());
 	}
 
-	/** @test */
-	public function testOverwriteAlias()
+    public function testOverwriteAlias(): void
 	{
 		$c = new AutoPimple();
 		$c['constant-1'] = 1;
@@ -165,30 +151,27 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals(2, $c['1+1']);
 	}
 
-	/** @test */
-	public function testFactoryHelperMethod()
+    public function testFactoryHelperMethod(): void
 	{
 		$c = new AutoPimple();
-		$c['array_factory'] = $c->share($c->factory(function($c) {
+		$c['array_factory'] = $c::share($c->factory(static function() {
 			return new ArrayObject();
 		}));
 		$firstArray = $c['array_factory']->newInstance();
 		$secondArray = $c['array_factory']->newInstance();
-		$this->assertTrue($firstArray instanceof ArrayObject);
+		$this->assertInstanceOf(ArrayObject::class, $firstArray);
 		$this->assertNotSame($firstArray, $secondArray);
 	}
 
-	/** @test */
-	public function testGetModifiedWithAutoInjectedParameters()
+    public function testGetModifiedWithAutoInjectedParameters(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
-		$newDepencency = new FixtureClasses\SimpleServiceWithoutDependencies();
-		$service = $c->getModified('fixture_classes.service_with_dependencies', array('dependency' => $newDepencency));
-		$this->assertSame($newDepencency, $service->getDependency());
+		$newDependency = new FixtureClasses\SimpleServiceWithoutDependencies();
+		$service = $c->getModified('fixture_classes.service_with_dependencies', array('dependency' => $newDependency));
+		$this->assertSame($newDependency, $service->getDependency());
 	}
 
-	/** @test */
-	public function testGetModifiedWithCustomInjectedParameters()
+    public function testGetModifiedWithCustomInjectedParameters(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$c['fixture_classes.service_with_unfulfillable_dependencies.value'] = 1;
@@ -196,24 +179,25 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals(2, $service->getValue());
 	}
 
-	/** @test */
-	public function testExtend()
+    public function testExtend(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$c->extend('fixture_classes.simple_service_without_dependencies', function($service, $c) {
 			return array($service, $c);
 		});
 		$this->assertTrue(is_array($c['fixture_classes.simple_service_without_dependencies']));
-		$this->assertTrue($c['fixture_classes.simple_service_without_dependencies'][0] instanceof SimpleServiceWithoutDependencies);
+		$this->assertInstanceOf(
+            SimpleServiceWithoutDependencies::class,
+            $c['fixture_classes.simple_service_without_dependencies'][0]
+        );
 		$this->assertSame($c, $c['fixture_classes.simple_service_without_dependencies'][1]);
 	}
 
-	/** @test */
-	public function testShareExtend()
+    public function testShareExtend(): void
 	{
 		$count = 0;
 		$c = new AutoPimple(array('auto_pimple.' => ''));
-		$extendedService = $c->extend('fixture_classes.simple_service_without_dependencies', function($service, $c) use(&$count) {
+		$extendedService = $c->extend('fixture_classes.simple_service_without_dependencies', static function($service, AutoPimple $c) use(&$count) {
 			$count += 1;
 			return array($service, $c);
 		});
@@ -222,13 +206,12 @@ class AutoPimpleTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals(1, $count);
 		$c['fixture_classes.simple_service_without_dependencies'];
 		$this->assertEquals(2, $count);
-		$c['fixture_classes.simple_service_without_dependencies'] = $c->share($extendedService);
+		$c['fixture_classes.simple_service_without_dependencies'] = $c::share($extendedService);
 		$this->assertTrue(is_array($c['fixture_classes.simple_service_without_dependencies']));
 		$this->assertEquals(3, $count);
 	}
 
-	/** @test */
-	public function testBugWithCachedGetModified()
+    public function testBugWithCachedGetModified(): void
 	{
 		$c = new AutoPimple(array('auto_pimple.' => ''));
 		$c['fixture_classes.service_with_unfulfillable_dependencies.value'] = 1;
